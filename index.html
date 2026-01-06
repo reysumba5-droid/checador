@@ -24,6 +24,8 @@
             background: radial-gradient(circle at 10% 20%, #dbeafe, #eff6ff 25%, #f8fafc);
             color: var(--text);
             padding: 40px 16px 60px;
+            position: relative;
+            min-height: 100vh;
         }
 
         .container {
@@ -78,6 +80,27 @@
             border-radius: 12px;
             font-weight: 600;
             border: 1px solid #dbeafe;
+        }
+
+        .user-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: #f1f5f9;
+            color: #0f172a;
+            border-radius: 999px;
+            border: 1px solid #e2e8f0;
+            font-weight: 700;
+        }
+
+        .user-chip button {
+            background: transparent;
+            color: var(--primary);
+            border: none;
+            padding: 6px 10px;
+            font-weight: 700;
+            box-shadow: none;
         }
 
         .grid {
@@ -225,6 +248,45 @@
             margin-top: 6px;
         }
 
+        .login-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(16, 185, 129, 0.08));
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            backdrop-filter: blur(4px);
+        }
+
+        .login-card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: var(--shadow);
+            border: 1px solid #e2e8f0;
+            display: grid;
+            gap: 14px;
+        }
+
+        .login-title {
+            margin: 0;
+            font-size: 22px;
+            letter-spacing: -0.02em;
+        }
+
+        .login-hint {
+            margin: 0;
+            color: var(--text-muted);
+        }
+
+        .login-error {
+            margin: 0;
+            color: var(--danger);
+            font-weight: 700;
+        }
+
         @media (max-width: 600px) {
             body { padding: 20px 10px 40px; }
             header { grid-template-columns: 1fr; }
@@ -233,15 +295,44 @@
     </style>
 </head>
 <body>
-<div class="container">
+<div class="login-overlay" id="loginOverlay" aria-live="polite">
+    <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <div>
+            <p class="badge" style="margin: 0 0 10px; display: inline-flex;">🔒 Acceso requerido</p>
+            <h2 class="login-title" id="loginTitle">Inicia sesión para continuar</h2>
+            <p class="login-hint">Usa un correo y contraseña de prueba para ver el checador en acción.</p>
+        </div>
+        <div class="form-group">
+            <label for="loginEmail">Correo</label>
+            <input type="email" id="loginEmail" placeholder="usuario@empresa.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label for="loginPassword">Contraseña</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <p class="login-error" id="loginError" aria-live="assertive"></p>
+        <div class="buttons" style="grid-template-columns: 1fr;">
+            <button class="compare" onclick="iniciarSesion()">Entrar y ver demo</button>
+        </div>
+    </div>
+</div>
+
+<div class="container" id="app" hidden>
     <header>
         <div>
             <h1>Checador de Personal</h1>
             <p class="subtitle">Registra entradas y salidas con un toque moderno y fácil de usar.</p>
         </div>
-        <div class="badge" aria-label="Estado del servicio">
-            <span>⚡</span>
-            <span>En línea y listo</span>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+            <div class="badge" aria-label="Estado del servicio">
+                <span>⚡</span>
+                <span>En línea y listo</span>
+            </div>
+            <div class="user-chip" id="userChip" aria-label="Sesión iniciada" style="display: none;">
+                <span>👤</span>
+                <span id="userName">Invitado</span>
+                <button type="button" onclick="mostrarLogin()">Cambiar</button>
+            </div>
         </div>
     </header>
 
@@ -296,6 +387,13 @@
     const cardDespues = document.getElementById('cardDespues');
     const registros = document.getElementById('registros');
     const nombreInput = document.getElementById('nombre');
+    const loginOverlay = document.getElementById('loginOverlay');
+    const loginEmail = document.getElementById('loginEmail');
+    const loginPassword = document.getElementById('loginPassword');
+    const loginError = document.getElementById('loginError');
+    const app = document.getElementById('app');
+    const userChip = document.getElementById('userChip');
+    const userNameLabel = document.getElementById('userName');
 
     function registrar(tipo) {
         const nombre = nombreInput.value.trim();
@@ -336,8 +434,62 @@
         }
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
+    function activarSesion(usuario) {
+        userNameLabel.textContent = usuario.email;
+        userChip.style.display = 'inline-flex';
+        loginOverlay.style.display = 'none';
+        app.hidden = false;
+        loginError.textContent = '';
         nombreInput.focus();
+    }
+
+    function iniciarSesion() {
+        const email = loginEmail.value.trim();
+        const password = loginPassword.value.trim();
+
+        if (!email || !password) {
+            loginError.textContent = 'Ingresa correo y contraseña.';
+            return;
+        }
+
+        const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+        if (!emailValido) {
+            loginError.textContent = 'Usa un correo válido (ej. persona@empresa.com).';
+            loginEmail.focus();
+            return;
+        }
+
+        loginError.textContent = '';
+        const usuario = { email };
+        localStorage.setItem('checadorUser', JSON.stringify(usuario));
+        activarSesion(usuario);
+    }
+
+    function mostrarLogin() {
+        app.hidden = true;
+        loginOverlay.style.display = 'grid';
+        loginError.textContent = '';
+        loginPassword.value = '';
+        loginEmail.focus();
+        localStorage.removeItem('checadorUser');
+        userChip.style.display = 'none';
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const guardado = localStorage.getItem('checadorUser');
+        if (guardado) {
+            try {
+                const usuario = JSON.parse(guardado);
+                if (usuario?.email) {
+                    activarSesion(usuario);
+                }
+            } catch (e) {
+                console.error('No se pudo restaurar la sesión');
+            }
+        } else {
+            loginEmail.focus();
+        }
+
         const ejemplos = [
             { nombre: 'Juana López', fecha: '12/09/2024', hora: '08:02 a. m.', tipo: 'Entrada' },
             { nombre: 'Carlos Méndez', fecha: '12/09/2024', hora: '12:59 p. m.', tipo: 'Salida' },
